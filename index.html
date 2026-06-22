@@ -32,12 +32,81 @@
             letter-spacing: 0.5px;
         }
 
+        /* ===== 作者头像模块 (fixed 左上角) ===== */
+        .author-avatar-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+        }
+
+        /* 头像图片 — 无边框，默认微弱底光 */
+        .author-avatar-container img {
+            width: 45px;
+            height: 45px;
+            border-radius: 4px;
+            object-fit: cover;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(101, 196, 198, 0.3);
+            transition: box-shadow 0.3s ease;
+        }
+
+        /* 悬停：底光变亮、范围变大 */
+        .author-avatar-container img:hover {
+            box-shadow: 0 0 20px rgba(101, 196, 198, 0.8), 0 0 30px rgba(101, 196, 198, 0.4);
+        }
+
+        /* ---- 气泡提示 — EVE 科幻风格 ---- */
+        .author-avatar-container .tooltip-bubble {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            left: calc(100% + 12px);
+            top: 50%;
+            transform: translateY(-50%) translateX(-4px);
+            background: rgba(10, 10, 10, 0.95);
+            border: 1px solid rgba(80, 80, 80, 0.6);
+            color: #dbe4ee;
+            font-size: 12px;
+            white-space: nowrap;
+            padding: 6px 12px;
+            pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0.25s ease, transform 0.25s ease;
+            z-index: 20;
+        }
+        .author-avatar-container .tooltip-bubble::before {
+            content: '';
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 5px solid transparent;
+            border-right-color: rgba(80, 80, 80, 0.6);
+        }
+        .author-avatar-container .tooltip-bubble::after {
+            content: '';
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 4px solid transparent;
+            border-right-color: rgba(10, 10, 10, 0.95);
+        }
+        .author-avatar-container:hover .tooltip-bubble {
+            visibility: visible;
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
+
         /* ===== 窗口卡片 (高度还原截图) ===== */
         .window-wrapper {
             position: relative;
             width: 100%;
             max-width: 650px;
-            padding: 4px; /* 为边角留出空间 */
+            padding: 10px; /* 为边角留出空间 */
         }
 
         /* 经典的 EVE 四角折线边框 */
@@ -50,10 +119,10 @@
             pointer-events: none;
             z-index: 10;
         }
-        .top-left { top: 0; left: 0; border-width: 2px 0 0 2px; }
-        .top-right { top: 0; right: 0; border-width: 2px 2px 0 0; }
-        .bottom-left { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
-        .bottom-right { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+        .top-left { top: 0; left: 0; border-width: 1px 0 0 1px; }
+        .top-right { top: 0; right: 0; border-width: 1px 1px 0 0; }
+        .bottom-left { bottom: 0; left: 0; border-width: 0 0 1px 1px; }
+        .bottom-right { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
 
         .card {
             background: rgba(18, 22, 28, 0.85);
@@ -179,7 +248,7 @@
         }
 
         .input-group input:focus {
-            border-color: #5599ff;
+            border-color: #65C4C6;
             background: rgba(20, 30, 40, 0.8);
         }
 
@@ -355,16 +424,18 @@
         .modal-overlay.active { display: flex; }
 
         .modal-box {
-            background: rgba(20, 20, 20, 0.95);
+            background: rgba(18, 22, 28, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(80, 80, 80, 0.6);
             width: 90%;
             max-width: 480px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
             position: relative;
         }
 
         .modal-header {
-            background: rgba(30, 30, 30, 0.9);
+            background: rgba(25, 25, 25, 0.9);
             padding: 8px 16px;
             border-bottom: 1px solid rgba(80, 80, 80, 0.6);
             display: flex;
@@ -398,12 +469,18 @@
 
         .modal-table input {
             background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(60, 60, 60, 0.6);
+            border: 1px solid rgba(80, 80, 80, 0.6);
             padding: 6px 8px;
             font-size: 14px;
             color: #fff;
             width: 95%;
             font-family: 'JetBrains Mono', 'Consolas', monospace;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .modal-table input:focus {
+            border-color: #65C4C6;
+            background: rgba(20, 30, 40, 0.8);
         }
 
         .del-btn {
@@ -427,18 +504,24 @@
             padding: 6px 14px;
             font-size: 12px;
             cursor: pointer;
-            background: rgba(40, 40, 40, 0.8); 
-            border: 1px solid rgba(80, 80, 80, 0.6); 
-            color: #ccc;
+            background: rgba(40, 50, 60, 0.8);
+            border: 1px solid rgba(80, 80, 80, 0.6);
+            color: #dbe4ee;
+            transition: all 0.2s;
         }
-        .modal-actions button:hover { background: rgba(60, 60, 60, 0.9); color: #fff; }
+        .modal-actions button:hover {
+            background: rgba(60, 80, 100, 0.9);
+            border-color: #536B73;
+            color: #fff;
+        }
         
         .modal-actions .btn-apply {
-            border-color: #5599ff;
-            color: #5599ff;
+            border-color: #65C4C6;
+            color: #65C4C6;
         }
         .modal-actions .btn-apply:hover {
-            background: #5599ff;
+            background: #65C4C6;
+            border-color: #65C4C6;
             color: #fff;
         }
 
@@ -450,6 +533,11 @@
     </style>
 </head>
 <body>
+
+    <div class="author-avatar-container">
+        <img src="2123823053.jpg" alt="作者头像" />
+        <span class="tooltip-bubble">赚到钱记得捐助作者xChengx点星币</span>
+    </div>
 
     <div class="window-wrapper">
         <div class="corner top-left"></div>
