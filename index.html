@@ -1,0 +1,822 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EVE 交易利润计算器</title>
+    <link rel="icon" href="logo.png" />
+    <style>
+        /* ===== 全局重置 ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            /* 深邃太空蓝径向渐变背景 */
+            background: radial-gradient(circle at center, #111820 0%, #05070a 100%);
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #dbe4ee;
+        }
+
+        /* 统一数字使用第一版的等宽字体 */
+        .eve-num {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== 窗口卡片 (高度还原截图) ===== */
+        .window-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 650px;
+            padding: 4px; /* 为边角留出空间 */
+        }
+
+        /* 经典的 EVE 四角折线边框 */
+        .corner {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-color: rgba(255, 255, 255, 0.8);
+            border-style: solid;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .top-left { top: 0; left: 0; border-width: 2px 0 0 2px; }
+        .top-right { top: 0; right: 0; border-width: 2px 2px 0 0; }
+        .bottom-left { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+        .bottom-right { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+        .card {
+            background: rgba(18, 22, 28, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(80, 80, 80, 0.6); /* 极细边框 */
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
+        }
+
+        /* 游戏内标题栏 */
+        .window-header {
+            background: rgba(25, 25, 25, 0.9);
+            padding: 6px 12px;
+            border-bottom: 1px solid rgba(80, 80, 80, 0.6);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: default;
+        }
+
+        .window-header h1 {
+            font-size: 13px;
+            font-weight: normal;
+            color: #dbe4ee;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+        }
+
+        .window-controls {
+            color: #888;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: default;
+            position: relative;
+        }
+        .window-controls:hover {
+            color: #fff;
+        }
+
+        /* 右上角 × 的气泡提示 */
+        .window-controls .tooltip-bubble {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            left: calc(100% + 10px);
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(10, 10, 10, 0.95);
+            border: 1px solid rgba(80, 80, 80, 0.6);
+            color: #dbe4ee;
+            font-size: 12px;
+            white-space: nowrap;
+            padding: 6px 12px;
+            pointer-events: none;
+            transition: opacity 0.2s, visibility 0.2s;
+            z-index: 20;
+        }
+        .window-controls .tooltip-bubble::before {
+            content: '';
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 5px solid transparent;
+            border-right-color: rgba(80, 80, 80, 0.6);
+        }
+        .window-controls .tooltip-bubble::after {
+            content: '';
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 4px solid transparent;
+            border-right-color: rgba(10, 10, 10, 0.95);
+        }
+        .window-controls:hover .tooltip-bubble {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .card-content {
+            padding: 20px 24px 24px;
+        }
+
+        /* ===== 输入区域 ===== */
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 20px;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(80, 80, 80, 0.4);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-group label {
+            font-size: 13px;
+            color: #a0a0a0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .input-group input {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(80, 80, 80, 0.6);
+            padding: 8px 10px;
+            font-size: 15px;
+            color: #fff;
+            outline: none;
+            transition: all 0.2s;
+            width: 100%;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+        }
+
+        .input-group input:focus {
+            border-color: #5599ff;
+            background: rgba(20, 30, 40, 0.8);
+        }
+
+        .input-group input::-webkit-inner-spin-button,
+        .input-group input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .input-group input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        /* 均价按钮区域 */
+        .buy-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .buy-row input {
+            flex: 1;
+        }
+        .avg-btn {
+            background: rgba(40, 50, 60, 0.8);
+            border: 1px solid rgba(80, 80, 80, 0.6);
+            padding: 0 12px;
+            height: 35px;
+            font-size: 12px;
+            color: #dbe4ee;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .avg-btn:hover {
+            background: rgba(60, 80, 100, 0.9);
+            border-color: #536B73;
+            color: #fff;
+        }
+
+        /* ===== 底部操作按钮 ===== */
+        .calc-btn {
+            width: 100%;
+            padding: 10px 0;
+            background: rgba(30, 40, 50, 0.6);
+            border: 1px solid rgba(100, 120, 140, 0.5);
+            font-size: 14px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .calc-btn:hover {
+            background: rgba(50, 70, 90, 0.8);
+            border-color: #536B73;
+        }
+
+        /* 空输入警告闪烁 */
+        @keyframes btn-flash-slow {
+            0%, 100% { border-color: rgba(100, 120, 140, 0.5); box-shadow: none; }
+            50% { border-color: #ff4444; box-shadow: 0 0 8px rgba(255, 68, 68, 0.4); }
+        }
+        @keyframes btn-flash-fast {
+            0%, 100% { border-color: rgba(100, 120, 140, 0.5); box-shadow: none; }
+            50% { border-color: #ff4444; box-shadow: 0 0 8px rgba(255, 68, 68, 0.4); }
+        }
+        .calc-btn.warning {
+            color: #ff4444 !important;
+            animation: btn-flash-slow 1s ease-in-out 2;
+        }
+        .calc-btn.warning.long {
+            animation: btn-flash-fast 0.5s ease-in-out 6;
+        }
+
+        /* 结果区域盈利/亏损闪烁（缓慢，各2秒） */
+        @keyframes result-flash-green {
+            0%, 100% { border-color: rgba(60, 60, 60, 0.6); box-shadow: none; }
+            50% { border-color: #44ff44; box-shadow: 0 0 12px rgba(68, 255, 68, 0.35); }
+        }
+        @keyframes result-flash-red {
+            0%, 100% { border-color: rgba(60, 60, 60, 0.6); box-shadow: none; }
+            50% { border-color: #ff4444; box-shadow: 0 0 12px rgba(255, 68, 68, 0.35); }
+        }
+        .result-section.flash-profit {
+            animation: result-flash-green 1s ease-in-out 2;
+        }
+        .result-section.flash-loss {
+            animation: result-flash-red 1s ease-in-out 2;
+        }
+
+        /* ===== 结果区域 ===== */
+        .result-section {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 16px 20px;
+            border: 1px solid rgba(60, 60, 60, 0.6);
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .result-row .label {
+            color: #a0a0a0;
+        }
+
+        .result-row .value {
+            color: #dbe4ee;
+        }
+
+        /* 对应截图中的颜色与发光效果 */
+        .result-row .value.positive { 
+            color: #66ff66; 
+            text-shadow: 0 0 6px rgba(102, 255, 102, 0.4);
+            font-weight: bold;
+        }
+        .result-row .value.negative { 
+            color: #ff5555; 
+            text-shadow: 0 0 6px rgba(255, 85, 85, 0.4);
+            font-weight: bold;
+        }
+        .result-row .value.highlight { color: #5599ff; }
+
+        .profit-row {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(80, 80, 80, 0.4);
+        }
+
+        .profit-row .label {
+            color: #fff;
+        }
+
+        .profit-row .value {
+            font-size: 18px;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 12px;
+            font-size: 12px;
+            color: #888;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .meta-row .highlight {
+            color: #bbb;
+        }
+
+        .footnote {
+            margin-top: 16px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        /* ===== 模态框 (均价计算) ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 7, 10, 0.8);
+            backdrop-filter: blur(2px);
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-box {
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(80, 80, 80, 0.6);
+            width: 90%;
+            max-width: 480px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            position: relative;
+        }
+
+        .modal-header {
+            background: rgba(30, 30, 30, 0.9);
+            padding: 8px 16px;
+            border-bottom: 1px solid rgba(80, 80, 80, 0.6);
+            display: flex;
+            justify-content: space-between;
+            color: #dbe4ee;
+            font-size: 13px;
+        }
+
+        .modal-content {
+            padding: 16px;
+        }
+
+        .modal-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .modal-table th {
+            text-align: left;
+            color: #888;
+            font-size: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(80, 80, 80, 0.4);
+            font-weight: normal;
+        }
+
+        .modal-table td {
+            padding: 4px 0;
+        }
+
+        .modal-table input {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(60, 60, 60, 0.6);
+            padding: 6px 8px;
+            font-size: 14px;
+            color: #fff;
+            width: 95%;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+        }
+
+        .del-btn {
+            background: rgba(60, 20, 20, 0.8);
+            border: 1px solid rgba(100, 40, 40, 0.5);
+            color: #ffaaaa;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .del-btn:hover { background: #ff5555; color: #fff; }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        .modal-actions button {
+            padding: 6px 14px;
+            font-size: 12px;
+            cursor: pointer;
+            background: rgba(40, 40, 40, 0.8); 
+            border: 1px solid rgba(80, 80, 80, 0.6); 
+            color: #ccc;
+        }
+        .modal-actions button:hover { background: rgba(60, 60, 60, 0.9); color: #fff; }
+        
+        .modal-actions .btn-apply {
+            border-color: #5599ff;
+            color: #5599ff;
+        }
+        .modal-actions .btn-apply:hover {
+            background: #5599ff;
+            color: #fff;
+        }
+
+        .optional-hint {
+            color: #666;
+            font-size: 11px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="window-wrapper">
+        <div class="corner top-left"></div>
+        <div class="corner top-right"></div>
+        <div class="corner bottom-left"></div>
+        <div class="corner bottom-right"></div>
+
+        <div class="card">
+            <div class="window-header">
+                <h1>交易利润计算器</h1>
+                <div class="window-controls">×<span class="tooltip-bubble">点不了，别试了，这是个装饰</span></div>
+            </div>
+
+            <div class="card-content">
+                <div class="input-grid">
+                    <div class="input-group" style="grid-column: 1 / 2;">
+                        <label>买入单价 (ISK)</label>
+                        <div class="buy-row">
+                            <input type="number" id="buyPrice" placeholder="0.00" step="any" min="0" />
+                            <button class="avg-btn" id="avgModalBtn" title="输入多批买入记录计算加权均价">计算均价</button>
+                        </div>
+                        <div style="font-size:11px; color:#666; margin-top:2px;">可直接输入，或点击计算多批均价</div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>卖出单价 (ISK)</label>
+                        <input type="number" id="sellPrice" placeholder="0.00" step="any" min="0" />
+                    </div>
+
+                    <div class="input-group">
+                        <label>销售税率 (%)</label>
+                        <input type="number" id="taxRate" placeholder="例如: 7.5" step="any" min="0" />
+                    </div>
+
+                    <div class="input-group">
+                        <label>货物数量</label>
+                        <input type="number" id="quantity" placeholder="0" step="1" min="1" />
+                    </div>
+
+                    <div class="input-group" style="grid-column: 1 / 3;">
+                        <label>中介费率 (%) <span class="optional-hint">挂单时收取，直接卖给收购单留空即可</span></label>
+                        <input type="number" id="brokerFee" placeholder="例如: 3.0" step="any" min="0" />
+                    </div>
+                </div>
+
+                <button class="calc-btn" id="calcBtn">开始计算</button>
+
+                <div class="result-section" id="resultArea">
+                    <div id="resultContent">
+                        <div style="text-align:center; color:#888; padding:10px 0; font-size:12px;">
+                            等待输入数据...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footnote">
+                    注：实际到手 ISK = 卖出总额 − 销售税 − 中介费 (若有)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="avgModal">
+        <div class="modal-box">
+            <div class="corner top-left"></div>
+            <div class="corner top-right"></div>
+            <div class="corner bottom-left"></div>
+            <div class="corner bottom-right"></div>
+
+            <div class="modal-header">
+                <span>加权均价计算器</span>
+            </div>
+            <div class="modal-content">
+                <table class="modal-table" id="avgTable">
+                    <thead>
+                        <tr>
+                            <th style="width:45%;">单价 (ISK)</th>
+                            <th style="width:40%;">数量</th>
+                            <th style="width:15%;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="avgTbody"></tbody>
+                </table>
+                <div class="modal-actions">
+                    <button id="addRowBtn">添加一行</button>
+                    <button id="clearRowsBtn">清空列表</button>
+                    <button class="btn-apply" id="applyAvgBtn">应用均价</button>
+                    <button id="closeModalBtn">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const buyInput = document.getElementById('buyPrice');
+            const sellInput = document.getElementById('sellPrice');
+            const taxInput = document.getElementById('taxRate');
+            const qtyInput = document.getElementById('quantity');
+            const brokerInput = document.getElementById('brokerFee');
+            const calcBtn = document.getElementById('calcBtn');
+            const resultContent = document.getElementById('resultContent');
+
+            const modal = document.getElementById('avgModal');
+            const tbody = document.getElementById('avgTbody');
+            const addBtn = document.getElementById('addRowBtn');
+            const clearBtn = document.getElementById('clearRowsBtn');
+            const applyBtn = document.getElementById('applyAvgBtn');
+            const closeBtn = document.getElementById('closeModalBtn');
+            const openModalBtn = document.getElementById('avgModalBtn');
+
+            function fmt(n) {
+                if (n === undefined || n === null || isNaN(n)) return '—';
+                return Number(n.toFixed(2)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function calculate() {
+                // 仅做数值计算，校验由外部 validateAndShowWarning 处理
+                if (buyInput.value.trim() === '') return null;
+                if (sellInput.value.trim() === '') return null;
+                if (taxInput.value.trim() === '') return null;
+                if (qtyInput.value.trim() === '') return null;
+
+                const buy = parseFloat(buyInput.value);
+                const sell = parseFloat(sellInput.value);
+                const taxPercent = parseFloat(taxInput.value);
+                const qty = parseInt(qtyInput.value, 10);
+                const brokerVal = parseFloat(brokerInput.value);
+
+                const brokerPercent = isNaN(brokerVal) ? 0 : brokerVal;
+
+                if (isNaN(buy) || buy < 0) return null;
+                if (isNaN(sell) || sell < 0) return null;
+                if (isNaN(taxPercent) || taxPercent < 0) return null;
+                if (isNaN(qty) || qty < 1 || !Number.isInteger(qty)) return null;
+                if (brokerPercent < 0) return null;
+
+                const totalCost = buy * qty;
+                const grossRevenue = sell * qty;
+                const taxAmount = grossRevenue * (taxPercent / 100);
+                const brokerAmount = grossRevenue * (brokerPercent / 100);
+                const netRevenue = grossRevenue - taxAmount - brokerAmount;
+                const netProfit = netRevenue - totalCost;
+                const grossProfit = (sell - buy) * qty;
+                const profitMargin = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
+
+                return { buy, sell, taxPercent, brokerPercent, qty, totalCost, grossRevenue, taxAmount, brokerAmount, netRevenue, netProfit, grossProfit, profitMargin };
+            }
+
+            function render() {
+                const result = calculate();
+                if (!result) return;
+
+                const { buy, totalCost, grossRevenue, taxAmount, brokerAmount, brokerPercent, netRevenue, netProfit, grossProfit, profitMargin, qty } = result;
+
+                const profitClass = netProfit >= 0 ? 'positive' : 'negative';
+                const profitSign = netProfit > 0 ? '+' : '';
+
+                let brokerRow = '';
+                if (brokerPercent > 0) {
+                    brokerRow = `
+                        <div class="result-row">
+                            <span class="label">中介费扣除</span>
+                            <span class="value eve-num" style="color:#aaa;">− ${fmt(brokerAmount)} ISK</span>
+                        </div>
+                    `;
+                }
+
+                resultContent.innerHTML = `
+                    <div class="result-row">
+                        <span class="label">买入总成本</span>
+                        <span class="value eve-num">${fmt(totalCost)} ISK</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="label">卖出总金额</span>
+                        <span class="value eve-num">${fmt(grossRevenue)} ISK</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="label">销售税扣除</span>
+                        <span class="value eve-num" style="color:#aaa;">− ${fmt(taxAmount)} ISK</span>
+                    </div>
+                    ${brokerRow}
+                    <div class="result-row">
+                        <span class="label">实际到手金额</span>
+                        <span class="value eve-num highlight">${fmt(netRevenue)} ISK</span>
+                    </div>
+
+                    <div class="result-row profit-row">
+                        <span class="label">净利润</span>
+                        <span class="value eve-num ${profitClass}">${profitSign}${fmt(netProfit)} ISK</span>
+                    </div>
+
+                    <div class="meta-row">
+                        <span>毛利差价: <span class="highlight eve-num">${fmt(grossProfit)}</span></span>
+                        <span>总利润率: <span class="highlight eve-num">${profitMargin > 0 ? '+' : ''}${profitMargin.toFixed(2)}%</span></span>
+                    </div>
+                `;
+                resultFlash(netProfit);
+            }
+
+            function getRowData() {
+                const rows = tbody.querySelectorAll('tr');
+                const data = [];
+                let hasZeroQty = false;
+                rows.forEach(tr => {
+                    const inputs = tr.querySelectorAll('input');
+                    if (inputs.length === 2) {
+                        const price = parseFloat(inputs[0].value);
+                        const qty = parseInt(inputs[1].value, 10);
+                        if (!isNaN(price) && price >= 0 && !isNaN(qty) && qty > 0) {
+                            data.push({ price, qty });
+                        }
+                        if (!isNaN(qty) && qty === 0) hasZeroQty = true;
+                    }
+                });
+                if (hasZeroQty) alert('提示：数量为 0 的行已被忽略，请填写正数数量。');
+                return data;
+            }
+
+            function addRow(priceVal = '', qtyVal = '') {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="number" step="any" min="0" placeholder="输入单价" value="${priceVal}" /></td>
+                    <td><input type="number" step="1" min="1" placeholder="输入数量" value="${qtyVal}" /></td>
+                    <td><button class="del-btn" title="删除">删 除</button></td>
+                `;
+                tbody.appendChild(tr);
+                tr.querySelector('.del-btn').addEventListener('click', function() {
+                    if (tbody.children.length > 1) {
+                        tr.remove();
+                    } else {
+                        alert('提示：请至少保留一行。');
+                    }
+                });
+            }
+
+            function loadDefaultRows() {
+                tbody.innerHTML = '';
+                addRow('', '');
+            }
+
+            function computeAverage() {
+                const data = getRowData();
+                if (data.length === 0) {
+                    alert('提示：请至少输入一组有效的单价和数量数据。');
+                    return null;
+                }
+                let totalCost = 0;
+                let totalQty = 0;
+                data.forEach(item => {
+                    totalCost += item.price * item.qty;
+                    totalQty += item.qty;
+                });
+                if (totalQty === 0) return null;
+                return totalCost / totalQty;
+            }
+
+            function applyAverage() {
+                const avg = computeAverage();
+                if (avg === null) return;
+                buyInput.value = avg.toFixed(6);
+                closeModal();
+                render();
+            }
+
+            function openModal() {
+                if (tbody.children.length === 0) loadDefaultRows();
+                modal.classList.add('active');
+            }
+
+            function closeModal() {
+                modal.classList.remove('active');
+            }
+
+            const ORIG_BTN_TEXT = '开始计算';
+            var btnLocked = false;
+            var resultLocked = false;
+
+            function showBtnWarning(text, duration) {
+                if (btnLocked) return;
+                btnLocked = true;
+                calcBtn.textContent = text;
+                calcBtn.classList.add('warning');
+                if (duration >= 3000) calcBtn.classList.add('long');
+                setTimeout(function() {
+                    calcBtn.classList.remove('warning', 'long');
+                    calcBtn.textContent = ORIG_BTN_TEXT;
+                    btnLocked = false;
+                }, duration);
+            }
+
+            function validateAndShowWarning() {
+                /* 全部为空 → 3 秒提示 */
+                if ([buyInput, sellInput, taxInput, qtyInput].every(function(inp) { return inp.value.trim() === ''; })) {
+                    showBtnWarning('你啥也没输入', 3000);
+                    return true;
+                }
+                /* 逐个字段空检查 → 2 秒提示 */
+                var checks = [
+                    { el: buyInput,  msg: '请输入买入单价' },
+                    { el: sellInput, msg: '请输入卖出单价' },
+                    { el: taxInput,  msg: '请输入销售税率' },
+                    { el: qtyInput,  msg: '请输入货物数量' }
+                ];
+                for (var i = 0; i < checks.length; i++) {
+                    if (checks[i].el.value.trim() === '') {
+                        showBtnWarning(checks[i].msg, 2000);
+                        return true;
+                    }
+                }
+                /* 数值有效性检查 → 2 秒提示 */
+                var buy = parseFloat(buyInput.value);
+                var sell = parseFloat(sellInput.value);
+                var tax = parseFloat(taxInput.value);
+                var qty = parseInt(qtyInput.value, 10);
+                var broker = parseFloat(brokerInput.value);
+                if (isNaN(buy) || buy < 0) { showBtnWarning('买入单价无效', 2000); return true; }
+                if (isNaN(sell) || sell < 0) { showBtnWarning('卖出单价无效', 2000); return true; }
+                if (isNaN(tax) || tax < 0) { showBtnWarning('销售税率无效', 2000); return true; }
+                if (isNaN(qty) || qty < 1 || !Number.isInteger(qty)) { showBtnWarning('货物数量无效', 2000); return true; }
+                if (!isNaN(broker) && broker < 0) { showBtnWarning('中介费率无效', 2000); return true; }
+                return false;
+            }
+
+            function resultFlash(netProfit) {
+                resultLocked = true;
+                var section = document.querySelector('.result-section');
+                section.classList.remove('flash-profit', 'flash-loss');
+                void section.offsetWidth;
+                if (netProfit >= 0) {
+                    section.classList.add('flash-profit');
+                } else {
+                    section.classList.add('flash-loss');
+                }
+                setTimeout(function() {
+                    section.classList.remove('flash-profit', 'flash-loss');
+                    resultLocked = false;
+                }, 2000);
+            }
+
+            function tryCalculate() {
+                if (btnLocked || resultLocked) return;
+                if (validateAndShowWarning()) return;
+                render();
+            }
+
+            calcBtn.addEventListener('click', tryCalculate);
+            openModalBtn.addEventListener('click', openModal);
+            closeBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+            addBtn.addEventListener('click', function() { addRow('', ''); });
+            clearBtn.addEventListener('click', loadDefaultRows);
+            applyBtn.addEventListener('click', applyAverage);
+
+            function handleEnter() {
+                tryCalculate();
+            }
+
+            const inputs = [buyInput, sellInput, taxInput, qtyInput, brokerInput];
+            inputs.forEach(inp => {
+                inp.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleEnter(); }
+                });
+            });
+
+            window.addEventListener('load', loadDefaultRows);
+        })();
+    </script>
+</body>
+</html>
